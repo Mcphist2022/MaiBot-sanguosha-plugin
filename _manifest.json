@@ -1,9 +1,10 @@
 {
   "manifest_version": 2,
-  "id": "Mcphist2022.sanguosha.plugin",
-  "version": "1.0.2",
+  "id": "mcphist2022.sanguosha.plugin",
+  "version": "1.1.0",
   "name": "麦麦三国杀台词姬",
-  "description": "检测 /三国杀 指令并随机回复预设台词",
+  "description": "检测 /三国杀 指令或群聊武将名，随机回复对应台词",
+  "plugin_type": "game",
   "author": {
     "name": "Mcphist",
     "url": "https://github.com/Mcphist2022"
@@ -18,7 +19,7 @@
   },
   "sdk": {
     "min_version": "2.0.0",
-    "max_version": "2.99.99"
+    "max_version": "999.999.999"
   },
   "capabilities": ["send.text"],
   "i18n": {
