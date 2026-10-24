@@ -1,0 +1,28 @@
+{
+  "manifest_version": 2,
+  "id": "Mcphist.sanguosha.plugin",
+  "version": "1.0.0",
+  "name": "三国杀台词",
+  "description": "检测 /三国杀 指令并随机回复预设台词",
+  "author": {
+    "name": "Mcphist",
+    "url": "https://example.com"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://example.com"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "2.0.0"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "capabilities": ["send.text"],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": ["zh-CN"]
+  }
+}
