@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "id": "Mcphist2022.sanguosha.plugin",
-  "version": "1.0.1",
-  "name": "三国杀台词",
+  "version": "1.0.2",
+  "name": "麦麦三国杀台词姬",
   "description": "检测 /三国杀 指令并随机回复预设台词",
   "author": {
     "name": "Mcphist",
