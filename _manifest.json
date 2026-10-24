@@ -1,16 +1,16 @@
 {
   "manifest_version": 2,
-  "id": "Mcphist.sanguosha.plugin",
-  "version": "1.0.0",
+  "id": "Mcphist2022.sanguosha.plugin",
+  "version": "1.0.1",
   "name": "三国杀台词",
   "description": "检测 /三国杀 指令并随机回复预设台词",
   "author": {
     "name": "Mcphist",
-    "url": "https://example.com"
+    "url": "https://github.com/Mcphist2022"
   },
   "license": "MIT",
   "urls": {
-    "repository": "https://example.com"
+    "repository": "https://github.com/Mcphist2022/Maibot-sanguosha-plugin"
   },
   "host_application": {
     "min_version": "1.0.0",
