@@ -58,9 +58,8 @@ class SanguoshaPlugin(MaiBotPlugin):
             self.ctx.logger.warning("台词库为空，请检查 sanguosha_quotes.txt 格式")
             return
 
-        # 按名字长度降序排列（确保正确匹配诸如 "群赵云" 而不是 "赵云"）
+        # 按名字长度降序排列，配合后续的 startswith 实现最长匹配
         self.general_names = sorted(self.general_quotes.keys(), key=len, reverse=True)
-        # 预计算所有台词，提升 /三国杀 全局抽取时的响应速度
         self.all_quotes = [q for quotes in self.general_quotes.values() for q in quotes]
 
         self.ctx.logger.info(
@@ -74,9 +73,8 @@ class SanguoshaPlugin(MaiBotPlugin):
         pass
 
     # 1. 随机指令：/三国杀
-    @Command("sanguosha", pattern=r"^/三国杀$")
+    @Command("sanguosha", pattern=r"^/三国杀$", description="随机抽取一句三国杀武将台词")
     async def handle_sanguosha(self, **kwargs):
-        # 检查 WebUI 中的开关状态
         if not self.config.plugin.enabled:
             return False, "插件已禁用", 0
 
@@ -89,10 +87,9 @@ class SanguoshaPlugin(MaiBotPlugin):
         return True, line, 2
 
     # 2. 指定武将指令：/张飞
-    # 使用命名捕获组，限制放宽到 1-15 个非空格、非斜杠字符，覆盖长名字武将
-    @Command("sanguosha_specific", pattern=r"^/(?P<general>[^\s/]{1,15})$")
+    # 正则限制在 1-15 个字符，防止系统级死循环。通过代码内逻辑精准过滤！
+    @Command("sanguosha_specific", pattern=r"^/(?P<general>[^\s/]{1,15})$", description="抽取指定武将的专属台词（如：/张飞）")
     async def handle_specific_general(self, **kwargs):
-        # 检查 WebUI 中的开关状态（返回 0 代表放行）
         if not self.config.plugin.enabled:
             return False, "插件已禁用", 0
 
@@ -110,14 +107,20 @@ class SanguoshaPlugin(MaiBotPlugin):
         if target_name == "三国杀":
             return False, "忽略三国杀指令", 0
 
-        # 按长度降序匹配武将名
+        # 【核心修复】通过代码逻辑判断是否为词库中的武将
+        # 先查一遍，如果完全不是词库里的前缀，直接光速放行，绝不干涉其他插件的指令！
+        is_potential_general = any(target_name.startswith(name) for name in self.general_names)
+        if not is_potential_general:
+            return False, "非武将指令，放行", 0
+
+        # 按长度降序匹配，排序在这里真正生效了！
         for name in self.general_names:
-            if name == target_name:
+            if target_name.startswith(name):
                 quote = random.choice(self.general_quotes[name])
                 await self.ctx.send.text(quote, kwargs["stream_id"])
                 return True, quote, 2
 
-        # 如果没有匹配到武将，返回 False 且拦截等级为 0（放行给正常聊天）
+        # 如果没有匹配到武将，返回 False 且拦截等级为 0
         return False, "未找到该武将，放行", 0
 
 
