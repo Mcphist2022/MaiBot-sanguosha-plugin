@@ -1,26 +1,39 @@
 import os
 import random
-from maibot_sdk import MaiBotPlugin, Command, EventHandler, PluginConfigBase, Field
-from maibot_sdk.types import EventType
+from typing import ClassVar
+from maibot_sdk import MaiBotPlugin, Command, PluginConfigBase, Field
 
-# 1. 声明配置模型
-class SanguoshaConfig(PluginConfigBase):
+
+# 1. 定义内层 [plugin] 配置节
+class PluginConfig(PluginConfigBase):
     enabled: bool = Field(default=True, description="是否启用插件")
+    config_version: str = Field(default="1.1.0", description="配置文件版本")
+
+
+# 2. 定义外层配置模型
+class SanguoshaConfig(PluginConfigBase):
+    plugin: PluginConfig = Field(default_factory=PluginConfig, description="插件配置")
+
 
 class SanguoshaPlugin(MaiBotPlugin):
-    # 2. 绑定配置模型
-    config_model = SanguoshaConfig
+    # 3. 绑定配置模型
+    config_model: ClassVar[type[PluginConfigBase]] = SanguoshaConfig
 
     def __init__(self):
         super().__init__()
         self.general_quotes = {}
         self.general_names = []
+        self.all_quotes = []
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
 
     async def on_load(self) -> None:
         self.ctx.logger.info("三国杀台词插件已加载，正在读取台词库...")
         txt_path = os.path.join(self.plugin_dir, "sanguosha_quotes.txt")
-        
+
+        if not os.path.exists(txt_path):
+            self.ctx.logger.error(f"台词库文件不存在: {txt_path}")
+            return
+
         try:
             with open(txt_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -34,11 +47,25 @@ class SanguoshaPlugin(MaiBotPlugin):
                     if general not in self.general_quotes:
                         self.general_quotes[general] = []
                     self.general_quotes[general].append(quote)
-            
-            self.general_names = sorted(self.general_quotes.keys(), key=len, reverse=True)
-            self.ctx.logger.info(f"成功加载了 {len(self.general_names)} 名武将的台词！")
+        except UnicodeDecodeError as e:
+            self.ctx.logger.error(f"台词库编码错误（需 UTF-8）: {e}")
+            return
         except Exception as e:
             self.ctx.logger.error(f"读取台词文件失败: {e}")
+            return
+
+        if not self.general_quotes:
+            self.ctx.logger.warning("台词库为空，请检查 sanguosha_quotes.txt 格式（武将名：台词）")
+            return
+
+        # 按名字长度降序排列（确保正确匹配诸如 "群赵云" 而不是 "赵云"）
+        self.general_names = sorted(self.general_quotes.keys(), key=len, reverse=True)
+        # 预计算所有台词，提升 /三国杀 全局抽取时的响应速度
+        self.all_quotes = [q for quotes in self.general_quotes.values() for q in quotes]
+        
+        self.ctx.logger.info(
+            f"成功加载了 {len(self.general_names)} 名武将、{len(self.all_quotes)} 条台词！"
+        )
 
     async def on_unload(self) -> None:
         pass
@@ -46,45 +73,51 @@ class SanguoshaPlugin(MaiBotPlugin):
     async def on_config_update(self, scope: str, config_data: dict, version: str) -> None:
         pass
 
+    # 1. 随机指令：/三国杀
     @Command("sanguosha", pattern=r"^/三国杀$")
     async def handle_sanguosha(self, **kwargs):
-        all_quotes = [q for quotes in self.general_quotes.values() for q in quotes]
-        if not all_quotes:
+        # 检查 WebUI 中的开关状态
+        if not self.config.plugin.enabled:
+            return False, "插件已禁用", 2
+
+        if not self.all_quotes:
             line = "台词库为空或读取失败！"
         else:
-            line = random.choice(all_quotes)
+            line = random.choice(self.all_quotes)
+            
         await self.ctx.send.text(line, kwargs["stream_id"])
         return True, line, 2
 
-    @EventHandler(
-        "sanguosha_passive",
-        description="检测群聊中的武将名并回复台词",
-        event_type=EventType.ON_MESSAGE_PRE_PROCESS,
-        intercept_message=True,
-        weight=100,
-    )
-    async def handle_passive_trigger(self, message, **kwargs):
-        raw_message = message.get("raw_message", "").strip()
+    # 2. 指定武将指令：/张飞（利用负向前瞻排除 /三国杀，避免指令冲突）
+    @Command("sanguosha_specific", pattern=r"^/(?!三国杀$).+")
+    async def handle_specific_general(self, **kwargs):
+        # 检查 WebUI 中的开关状态
+        if not self.config.plugin.enabled:
+            return False, "插件已禁用", 2
+
+        target_name = ""
         
-        if raw_message.startswith("/"):
-            return {"intercepted": False}
-            
-        detected_general = None
+        # 优先从正则匹配组中获取（最准确，规避不同 SDK 版本的传参差异）
+        if "matches" in kwargs and kwargs["matches"]:
+            target_name = str(kwargs["matches"][0]).strip()
+        else:
+            # 兼容获取整段文本的情况
+            raw_text = kwargs.get("raw_text") or kwargs.get("message") or ""
+            target_name = str(raw_text).strip().lstrip('/').strip()
+
+        if not target_name:
+            return False, "未获取到武将名", 2
+
+        # 按长度降序匹配武将名
         for name in self.general_names:
-            if len(name) < 2:
-                continue
-            if name in raw_message:
-                detected_general = name
-                break
-        
-        if detected_general:
-            quote = random.choice(self.general_quotes[detected_general])
-            stream_id = message.get("stream_id") or kwargs.get("stream_id")
-            if stream_id:
-                await self.ctx.send.text(quote, stream_id)
-            return {"intercepted": True}
-            
-        return {"intercepted": False}
+            if name in target_name:
+                quote = random.choice(self.general_quotes[name])
+                await self.ctx.send.text(quote, kwargs["stream_id"])
+                return True, quote, 2
+                
+        # 如果没有匹配到武将，静默返回，交给主程序处理（作为普通聊天）
+        return False, "未找到该武将", 2
+
 
 def create_plugin():
     return SanguoshaPlugin()
