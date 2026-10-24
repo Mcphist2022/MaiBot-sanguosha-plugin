@@ -43,7 +43,7 @@ class SanguoshaPlugin(MaiBotPlugin):
                     general, quote = line.split('：', 1)
                     general = general.strip()
                     quote = quote.strip()
-                    
+
                     if general not in self.general_quotes:
                         self.general_quotes[general] = []
                     self.general_quotes[general].append(quote)
@@ -55,14 +55,14 @@ class SanguoshaPlugin(MaiBotPlugin):
             return
 
         if not self.general_quotes:
-            self.ctx.logger.warning("台词库为空，请检查 sanguosha_quotes.txt 格式（武将名：台词）")
+            self.ctx.logger.warning("台词库为空，请检查 sanguosha_quotes.txt 格式")
             return
 
         # 按名字长度降序排列（确保正确匹配诸如 "群赵云" 而不是 "赵云"）
         self.general_names = sorted(self.general_quotes.keys(), key=len, reverse=True)
         # 预计算所有台词，提升 /三国杀 全局抽取时的响应速度
         self.all_quotes = [q for quotes in self.general_quotes.values() for q in quotes]
-        
+
         self.ctx.logger.info(
             f"成功加载了 {len(self.general_names)} 名武将、{len(self.all_quotes)} 条台词！"
         )
@@ -84,7 +84,7 @@ class SanguoshaPlugin(MaiBotPlugin):
             line = "台词库为空或读取失败！"
         else:
             line = random.choice(self.all_quotes)
-            
+
         await self.ctx.send.text(line, kwargs["stream_id"])
         return True, line, 2
 
@@ -96,7 +96,7 @@ class SanguoshaPlugin(MaiBotPlugin):
             return False, "插件已禁用", 2
 
         target_name = ""
-        
+
         # 优先从正则匹配组中获取（最准确，规避不同 SDK 版本的传参差异）
         if "matches" in kwargs and kwargs["matches"]:
             target_name = str(kwargs["matches"][0]).strip()
@@ -114,7 +114,7 @@ class SanguoshaPlugin(MaiBotPlugin):
                 quote = random.choice(self.general_quotes[name])
                 await self.ctx.send.text(quote, kwargs["stream_id"])
                 return True, quote, 2
-                
+
         # 如果没有匹配到武将，静默返回，交给主程序处理（作为普通聊天）
         return False, "未找到该武将", 2
 
