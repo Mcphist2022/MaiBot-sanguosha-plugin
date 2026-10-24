@@ -89,8 +89,8 @@ class SanguoshaPlugin(MaiBotPlugin):
         return True, line, 2
 
     # 2. 指定武将指令：/张飞
-    # 使用命名捕获组，严格限制为 1-12 个非空格、非斜杠字符，避免顶掉其他指令
-    @Command("sanguosha_specific", pattern=r"^/(?P<general>[^\s/]{1,12})$")
+    # 使用命名捕获组，限制放宽到 1-15 个非空格、非斜杠字符，覆盖长名字武将
+    @Command("sanguosha_specific", pattern=r"^/(?P<general>[^\s/]{1,15})$")
     async def handle_specific_general(self, **kwargs):
         # 检查 WebUI 中的开关状态（返回 0 代表放行）
         if not self.config.plugin.enabled:
