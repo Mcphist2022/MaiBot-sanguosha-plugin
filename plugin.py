@@ -78,7 +78,7 @@ class SanguoshaPlugin(MaiBotPlugin):
     async def handle_sanguosha(self, **kwargs):
         # 检查 WebUI 中的开关状态
         if not self.config.plugin.enabled:
-            return False, "插件已禁用", 2
+            return False, "插件已禁用", 0
 
         if not self.all_quotes:
             line = "台词库为空或读取失败！"
@@ -88,35 +88,37 @@ class SanguoshaPlugin(MaiBotPlugin):
         await self.ctx.send.text(line, kwargs["stream_id"])
         return True, line, 2
 
-    # 2. 指定武将指令：/张飞（利用负向前瞻排除 /三国杀，避免指令冲突）
-    @Command("sanguosha_specific", pattern=r"^/(?!三国杀$).+")
+    # 2. 指定武将指令：/张飞
+    # 使用命名捕获组，严格限制为 1-12 个非空格、非斜杠字符，避免顶掉其他指令
+    @Command("sanguosha_specific", pattern=r"^/(?P<general>[^\s/]{1,12})$")
     async def handle_specific_general(self, **kwargs):
-        # 检查 WebUI 中的开关状态
+        # 检查 WebUI 中的开关状态（返回 0 代表放行）
         if not self.config.plugin.enabled:
-            return False, "插件已禁用", 2
+            return False, "插件已禁用", 0
 
         target_name = ""
-
-        # 优先从正则匹配组中获取（最准确，规避不同 SDK 版本的传参差异）
-        if "matches" in kwargs and kwargs["matches"]:
-            target_name = str(kwargs["matches"][0]).strip()
-        else:
-            # 兼容获取整段文本的情况
-            raw_text = kwargs.get("raw_text") or kwargs.get("message") or ""
-            target_name = str(raw_text).strip().lstrip('/').strip()
+        
+        # 从宿主传入的 matched_groups 安全获取参数
+        matched_groups = kwargs.get("matched_groups", {})
+        if isinstance(matched_groups, dict):
+            target_name = matched_groups.get("general", "").strip()
 
         if not target_name:
-            return False, "未获取到武将名", 2
+            return False, "未获取到武将名", 0
+
+        # 如果用户发的刚好是 "/三国杀"，交由第一个指令处理，本指令放行
+        if target_name == "三国杀":
+            return False, "忽略三国杀指令", 0
 
         # 按长度降序匹配武将名
         for name in self.general_names:
-            if name in target_name:
+            if name == target_name:
                 quote = random.choice(self.general_quotes[name])
                 await self.ctx.send.text(quote, kwargs["stream_id"])
                 return True, quote, 2
 
-        # 如果没有匹配到武将，静默返回，交给主程序处理（作为普通聊天）
-        return False, "未找到该武将", 2
+        # 如果没有匹配到武将，返回 False 且拦截等级为 0（放行给正常聊天）
+        return False, "未找到该武将，放行", 0
 
 
 def create_plugin():
